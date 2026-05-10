@@ -24,8 +24,8 @@ const validateRegister = [
         .notEmpty().withMessage('Email is required'),
     
     body('password')
-        .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
-        .matches(/^(?=.*[A-Za-z])(?=.*\d)/).withMessage('Password must contain at least one letter and one number'),
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+        .matches(/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])/).withMessage('Password must contain letter, number, and special character'),
     
     body('name')
         .trim()

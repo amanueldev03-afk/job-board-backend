@@ -32,16 +32,24 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'default-avatar.png'
     },
-    googleId: {
-        type: String,
-        unique: true,
-        sparse: true
+   googleId: {
+    type: String,
+    unique: true,
+    sparse: true
     },
-    authProvider: {
-        type: String,
-        enum: ['local', 'google', 'facebook', 'linkedin'],
-        default: 'local'
-    },
+   authProvider: {
+    type: String,
+    enum: ['local', 'google', 'facebook'],
+    default: 'local'
+ },
+ loginAttempts: {
+    type: Number,
+    default: 0
+},
+lockUntil: {
+    type: Date,
+    default: null
+},
     emailPreferences: {
     type: {
         marketing: { type: Boolean, default: true },

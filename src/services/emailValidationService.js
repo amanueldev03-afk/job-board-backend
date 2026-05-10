@@ -1,18 +1,18 @@
-const emailValidator = require('email-validator');
+const validator = require('email-validator');
 const deepEmailValidator = require('deep-email-validator');
 
 const validateEmailFormat = (email) => {
-    return emailValidator.validate(email);
+    return validator.validate(email);
 };
 
 const validateEmailDeliverable = async (email) => {
     try {
         const result = await deepEmailValidator({
             email: email,
-            validateSMTP: true,  // Check if SMTP server exists
-            validateMx: true,    // Check MX records
-            validateDisposable: true, // Check temp/disposable emails
-            validateRegex: true   // Check format
+            validateSMTP: true,
+            validateMx: true,
+            validateDisposable: true,
+            validateRegex: true
         });
         
         return {
@@ -21,11 +21,7 @@ const validateEmailDeliverable = async (email) => {
             suggestions: result.suggestions || null
         };
     } catch (error) {
-        return {
-            valid: true, // Assume valid if check fails
-            reason: null,
-            suggestions: null
-        };
+        return { valid: true, reason: null, suggestions: null };
     }
 };
 
@@ -33,25 +29,25 @@ const isDisposableEmail = (email) => {
     const disposableDomains = [
         'tempmail.com', '10minutemail.com', 'guerrillamail.com',
         'mailinator.com', 'yopmail.com', 'throwaway.com',
-        'temp-mail.org', 'fakeinbox.com', 'trashmail.com'
+        'temp-mail.org', 'fakeinbox.com', 'trashmail.com',
+        'tempmail.net', 'sharklasers.com', 'guerrillamail.net'
     ];
-    
     const domain = email.split('@')[1];
     return disposableDomains.includes(domain);
 };
 
 const getEmailProvider = (email) => {
     const domain = email.split('@')[1].toLowerCase();
-    
     const providers = {
         'gmail.com': 'Gmail',
         'yahoo.com': 'Yahoo',
         'outlook.com': 'Outlook',
         'hotmail.com': 'Hotmail',
         'protonmail.com': 'ProtonMail',
-        'icloud.com': 'iCloud'
+        'icloud.com': 'iCloud',
+        'aol.com': 'AOL',
+        'zoho.com': 'Zoho'
     };
-    
     return providers[domain] || 'Other';
 };
 

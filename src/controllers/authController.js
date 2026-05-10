@@ -13,7 +13,6 @@ const register = async (req, res, next) => {
     try {
         const { email, password, name, role } = req.body;
 
-        // ============ EMAIL VALIDATION ============
         const emailCheck = await emailValidationService.validateEmail(email);
         
         if (!emailCheck.valid) {
@@ -23,13 +22,17 @@ const register = async (req, res, next) => {
 
         logger.info(`Email validation passed: ${email} (${emailCheck.provider})`);
 
-        // ============ EXISTING USER CHECK ============
+        if (!passwordUtils.isStrongPassword(password)) {
+            return responseUtils.sendBadRequest(res, 
+                'Password must be at least 8 characters and contain uppercase, lowercase, number, and special character'
+            );
+        }
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return responseUtils.sendBadRequest(res, 'Email already registered');
         }
 
-        // ============ CREATE USER ============
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
 
@@ -40,18 +43,16 @@ const register = async (req, res, next) => {
             role: role || 'candidate',
             emailVerificationToken: hashedToken,
             emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000,
-            isVerified: false
+            isVerified: false,
+            authProvider: 'local'
         });
 
-        // ============ SEND VERIFICATION EMAIL ============
         try {
             await emailService.sendVerificationEmail(email, name, verificationToken);
             logger.info(`Verification email sent to: ${email}`);
         } catch (emailError) {
             logger.error(`Failed to send verification email to ${email}: ${emailError.message}`);
         }
-
-        logger.info(`User registered: ${email} (${emailCheck.provider}) - verification email sent`);
 
         responseUtils.sendSuccess(res, {
             message: 'Registration successful! Please check your email to verify your account.',
@@ -104,7 +105,6 @@ const resendVerificationEmail = async (req, res, next) => {
             return responseUtils.sendBadRequest(res, 'Email is required');
         }
 
-        // ============ VALIDATE EMAIL FIRST ============
         const emailCheck = await emailValidationService.validateEmail(email);
         
         if (!emailCheck.valid) {
@@ -150,23 +150,34 @@ const login = async (req, res, next) => {
             return responseUtils.sendUnauthorized(res, 'Invalid email or password');
         }
 
-        if (!user.isVerified) {
-            logger.warn(`Login failed: Email not verified - ${email}`);
-            return responseUtils.sendUnauthorized(res, 'Please verify your email before logging in');
+        if (user.lockUntil && user.lockUntil > Date.now()) {
+            const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+            return responseUtils.sendUnauthorized(res, `Account locked. Try again in ${minutesLeft} minutes.`);
         }
 
-        if (!user.isActive) {
-            logger.warn(`Login failed: Inactive account - ${email}`);
-            return responseUtils.sendUnauthorized(res, 'Account deactivated. Contact support.');
+        if (!user.isVerified && user.authProvider === 'local') {
+            logger.warn(`Login failed: Email not verified - ${email}`);
+            return responseUtils.sendUnauthorized(res, 'Please verify your email before logging in');
         }
 
         const isPasswordValid = await passwordUtils.comparePassword(password, user.password);
         
         if (!isPasswordValid) {
-            logger.warn(`Login failed: Invalid password - ${email}`);
+            user.loginAttempts = (user.loginAttempts || 0) + 1;
+            
+            if (user.loginAttempts >= 5) {
+                user.lockUntil = Date.now() + 30 * 60 * 1000;
+                await user.save();
+                return responseUtils.sendUnauthorized(res, 'Too many failed attempts. Account locked for 30 minutes.');
+            }
+            
+            await user.save();
+            logger.warn(`Login failed: Invalid password - ${email} (Attempt ${user.loginAttempts}/5)`);
             return responseUtils.sendUnauthorized(res, 'Invalid email or password');
         }
 
+        user.loginAttempts = 0;
+        user.lockUntil = null;
         user.lastLogin = new Date();
         await user.save();
 
@@ -191,7 +202,8 @@ const login = async (req, res, next) => {
                 name: user.name,
                 role: user.role,
                 avatar: user.avatar,
-                isVerified: user.isVerified
+                isVerified: user.isVerified,
+                authProvider: user.authProvider
             },
             accessToken,
             refreshToken,
@@ -350,7 +362,6 @@ const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
 
-        // ============ VALIDATE EMAIL FOR RESET ============
         const emailCheck = await emailValidationService.validateEmail(email);
         
         if (!emailCheck.valid) {
@@ -435,6 +446,45 @@ const testEmailValidation = async (req, res, next) => {
         next(error);
     }
 };
+
+const googleLoginSuccess = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            return responseUtils.sendUnauthorized(res, 'Google authentication failed');
+        }
+
+        const accessToken = tokenService.generateAccessToken(req.user._id);
+        const refreshToken = await tokenService.generateRefreshToken(
+            req.user._id,
+            req.headers['user-agent'] || 'unknown',
+            req.ip || req.socket.remoteAddress
+        );
+
+        logger.info(`Google login successful: ${req.user.email}`);
+
+        responseUtils.sendSuccess(res, {
+            user: {
+                id: req.user._id,
+                email: req.user.email,
+                name: req.user.name,
+                role: req.user.role,
+                avatar: req.user.avatar,
+                isVerified: req.user.isVerified,
+                authProvider: req.user.authProvider
+            },
+            accessToken,
+            refreshToken
+        }, 'Google login successful');
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+const googleLoginFailed = async (req, res, next) => {
+    responseUtils.sendUnauthorized(res, 'Google authentication failed. Please try again.');
+};
+
 module.exports = {
     register,
     verifyEmail,
@@ -448,5 +498,7 @@ module.exports = {
     changePassword,
     forgotPassword,
     resetPassword,
-    testEmailValidation
+    testEmailValidation,
+    googleLoginSuccess,
+    googleLoginFailed
 };

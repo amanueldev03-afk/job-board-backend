@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const googleAuthRoutes = require('./googleAuthRoutes');
 const { protect } = require('../middleware/authMiddleware');
 const { validateRegister, validateLogin } = require('../middleware/validationMiddleware');
 const { 
@@ -10,6 +11,10 @@ const {
     resendVerificationLimiter 
 } = require('../middleware/rateLimiter');
 
+// ============ GOOGLE AUTH (NO PASSWORD NEEDED) ============
+router.use('/', googleAuthRoutes);
+
+// ============ REGULAR AUTH (EMAIL + PASSWORD) ============
 router.post('/register', registerLimiter, validateRegister, authController.register);
 router.get('/verify-email/:token', authController.verifyEmail);
 router.post('/resend-verification', resendVerificationLimiter, authController.resendVerificationEmail);
@@ -22,6 +27,7 @@ router.put('/profile', protect, authController.updateProfile);
 router.put('/change-password', protect, authController.changePassword);
 router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
+router.post('/test-email-validation', authController.testEmailValidation);
 router.post('/test-email-validation', authController.testEmailValidation);
 
 module.exports = router;

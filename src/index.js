@@ -40,6 +40,25 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
+// ============ SESSION & PASSPORT (Add this) ============
+const session = require('express-session');
+const passport = require('./config/passport');
+
+// Session middleware (required for passport)
+app.use(session({
+    secret: env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: env.isProduction,
+        maxAge: 24 * 60 * 60 * 1000
+    }
+}));
+
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 if (env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
 }
