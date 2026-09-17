@@ -17,7 +17,7 @@
     "prisma:studio": "prisma studio",
     "lint": "eslint src",
     "type-check": "tsc --noEmit",
-    "test": "ts-node -r dotenv/config test/app.test.ts && ts-node -r dotenv/config test/database.test.ts && ts-node -r dotenv/config test/auth.test.ts && ts-node -r dotenv/config test/authorization.test.ts"
+    "test": "ts-node -r dotenv/config test/app.test.ts && ts-node -r dotenv/config test/database.test.ts && ts-node -r dotenv/config test/auth.test.ts && ts-node -r dotenv/config test/authorization.test.ts && ts-node -r dotenv/config test/employer.test.ts"
   },
   "keywords": [
     "job-board",
