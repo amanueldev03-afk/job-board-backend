@@ -1,7 +1,7 @@
 /// <reference path="../types/express.d.ts" />
 import { Request, Response } from 'express';
 import { jobService } from '../services/jobService';
-import { sendCreated, sendSuccess, sendNoContent } from '../utils/response';
+import { sendCreated, sendSuccess, sendNoContent, sendPaginated } from '../utils/response';
 import { asyncHandler } from '../utils/asyncHandler';
 import { UnauthorizedError } from '../middleware/errorHandler';
 
@@ -44,4 +44,22 @@ export const deleteJob = asyncHandler(async (req: Request, res: Response) => {
 
   await jobService.deleteJob(req.user, req.params.id as string);
   return sendNoContent(res);
+});
+
+export const searchJobs = asyncHandler(async (req: Request, res: Response) => {
+  const filters = {
+    keyword: req.query.keyword as string | undefined,
+    jobType: req.query.jobType as string | undefined,
+    experienceLevel: req.query.experienceLevel as string | undefined,
+    location: req.query.location as string | undefined,
+    isRemote: req.query.isRemote === 'true' ? true : req.query.isRemote === 'false' ? false : undefined,
+    salaryMin: req.query.salaryMin ? parseFloat(req.query.salaryMin as string) : undefined,
+    salaryMax: req.query.salaryMax ? parseFloat(req.query.salaryMax as string) : undefined,
+    status: req.query.status as string | undefined,
+    page: req.query.page ? parseInt(req.query.page as string) : 1,
+    limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
+  };
+
+  const result = await jobService.searchJobs(filters);
+  return sendPaginated(res, result.jobs, result.pagination, 'Job listings retrieved successfully');
 });

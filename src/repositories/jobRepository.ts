@@ -111,6 +111,107 @@ export class JobRepository {
       },
     });
   }
+
+  public async search(filters: {
+    keyword?: string;
+    jobType?: string;
+    experienceLevel?: string;
+    location?: string;
+    isRemote?: boolean;
+    salaryMin?: number;
+    salaryMax?: number;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const {
+      keyword,
+      jobType,
+      experienceLevel,
+      location,
+      isRemote,
+      salaryMin,
+      salaryMax,
+      status = 'OPEN',
+      page = 1,
+      limit = 10,
+    } = filters;
+
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      status,
+      deadline: {
+        gte: new Date(),
+      },
+    };
+
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword, mode: 'insensitive' } },
+        { description: { contains: keyword, mode: 'insensitive' } },
+        { skills: { has: keyword } },
+        { requirements: { has: keyword } },
+        { responsibilities: { has: keyword } },
+      ];
+    }
+
+    if (jobType) {
+      where.jobType = jobType;
+    }
+
+    if (experienceLevel) {
+      where.experienceLevel = experienceLevel;
+    }
+
+    if (location) {
+      where.location = { contains: location, mode: 'insensitive' };
+    }
+
+    if (isRemote !== undefined) {
+      where.isRemote = isRemote;
+    }
+
+    if (salaryMin !== undefined || salaryMax !== undefined) {
+      where.salaryMin = {};
+      if (salaryMin !== undefined) {
+        where.salaryMin.gte = salaryMin;
+      }
+      if (salaryMax !== undefined) {
+        where.salaryMax = { lte: salaryMax };
+      }
+    }
+
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          employer: {
+            select: this.employerSelect,
+          },
+          _count: {
+            select: { applications: true },
+          },
+        },
+      }),
+      prisma.job.count({ where }),
+    ]);
+
+    return {
+      jobs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
 }
 
 export const jobRepository = new JobRepository();

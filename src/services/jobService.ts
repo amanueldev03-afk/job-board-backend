@@ -157,6 +157,25 @@ export class JobService {
 
     await this.jobRepo.deleteById(jobId);
   }
+
+  /**
+   * Search job listings with filters and pagination.
+   * Public endpoint - no authentication required.
+   */
+  public async searchJobs(filters: {
+    keyword?: string;
+    jobType?: string;
+    experienceLevel?: string;
+    location?: string;
+    isRemote?: boolean;
+    salaryMin?: number;
+    salaryMax?: number;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.jobRepo.search(filters);
+  }
 }
 
 export const jobService = new JobService();

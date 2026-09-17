@@ -1,4 +1,4 @@
-import { body, param, ValidationChain } from 'express-validator';
+import { body, param, query, ValidationChain } from 'express-validator';
 
 const VALID_JOB_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'];
 const VALID_EXPERIENCE_LEVELS = ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE'];
@@ -170,4 +170,58 @@ export const validateUpdateJob: ValidationChain[] = [
     .optional({ checkFalsy: true })
     .isISO8601()
     .withMessage('Deadline must be a valid ISO 8601 date string'),
+];
+
+export const validateSearchJobs: ValidationChain[] = [
+  query('keyword')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Keyword cannot exceed 100 characters'),
+
+  query('jobType')
+    .optional()
+    .isIn(VALID_JOB_TYPES)
+    .withMessage(`Job type must be one of: ${VALID_JOB_TYPES.join(', ')}`),
+
+  query('experienceLevel')
+    .optional()
+    .isIn(VALID_EXPERIENCE_LEVELS)
+    .withMessage(`Experience level must be one of: ${VALID_EXPERIENCE_LEVELS.join(', ')}`),
+
+  query('location')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Location cannot exceed 100 characters'),
+
+  query('isRemote')
+    .optional()
+    .isIn(['true', 'false'])
+    .withMessage('isRemote must be either true or false'),
+
+  query('salaryMin')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Minimum salary must be a positive number'),
+
+  query('salaryMax')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Maximum salary must be a positive number'),
+
+  query('status')
+    .optional()
+    .isIn(VALID_JOB_STATUSES)
+    .withMessage(`Job status must be one of: ${VALID_JOB_STATUSES.join(', ')}`),
+
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
 ];

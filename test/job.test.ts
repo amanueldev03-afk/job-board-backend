@@ -546,4 +546,341 @@ describe('Phase 4: Job Listing Creation & Authorization Test Suite', () => {
       assert.strictEqual(res.body.success, false);
     });
   });
+
+  describe('7. Job Search API (GET /api/v1/jobs/search)', () => {
+    let searchJob1: any;
+    let searchJob2: any;
+    let searchJob3: any;
+
+    before(async () => {
+      const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      
+      searchJob1 = await prisma.job.create({
+        data: {
+          employerId: employerProfile.id,
+          title: 'Senior Backend Engineer',
+          description: 'We are looking for an experienced Backend Engineer to design scalable microservices.',
+          location: 'Austin, TX',
+          jobType: 'FULL_TIME',
+          experienceLevel: 'SENIOR',
+          skills: ['Node.js', 'Express', 'TypeScript', 'PostgreSQL'],
+          isRemote: true,
+          salaryMin: 120000,
+          salaryMax: 160000,
+          status: 'OPEN',
+          deadline: new Date(futureDate),
+        },
+      });
+
+      searchJob2 = await prisma.job.create({
+        data: {
+          employerId: employerProfile.id,
+          title: 'Frontend Developer',
+          description: 'Build beautiful user interfaces with React and modern CSS.',
+          location: 'Remote',
+          jobType: 'PART_TIME',
+          experienceLevel: 'JUNIOR',
+          skills: ['React', 'CSS', 'JavaScript'],
+          isRemote: true,
+          salaryMin: 60000,
+          salaryMax: 80000,
+          status: 'OPEN',
+          deadline: new Date(futureDate),
+        },
+      });
+
+      searchJob3 = await prisma.job.create({
+        data: {
+          employerId: employerProfile.id,
+          title: 'DevOps Engineer',
+          description: 'Manage infrastructure and CI/CD pipelines.',
+          location: 'San Francisco, CA',
+          jobType: 'CONTRACT',
+          experienceLevel: 'MID',
+          skills: ['Docker', 'Kubernetes', 'AWS'],
+          isRemote: false,
+          salaryMin: 100000,
+          salaryMax: 140000,
+          status: 'OPEN',
+          deadline: new Date(futureDate),
+        },
+      });
+    });
+
+    after(async () => {
+      await prisma.job.deleteMany({
+        where: { id: { in: [searchJob1.id, searchJob2.id, searchJob3.id] } },
+      });
+    });
+
+    it('should return paginated job listings with default parameters', async () => {
+      const res = await request(app).get('/api/v1/jobs/search');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(Array.isArray(res.body.data));
+      assert.ok(res.body.meta);
+      assert.strictEqual(res.body.meta.page, 1);
+      assert.strictEqual(res.body.meta.limit, 10);
+      assert.ok(res.body.meta.total >= 3);
+    });
+
+    it('should search jobs by keyword in title', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=Backend');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.some((j: any) => j.title.includes('Backend')));
+    });
+
+    it('should search jobs by keyword in skills', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=React');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.some((j: any) => j.skills.includes('React')));
+    });
+
+    it('should filter jobs by jobType', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?jobType=FULL_TIME');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.jobType === 'FULL_TIME'));
+    });
+
+    it('should filter jobs by experienceLevel', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?experienceLevel=SENIOR');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.experienceLevel === 'SENIOR'));
+    });
+
+    it('should filter jobs by location', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?location=Remote');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.location.toLowerCase().includes('remote')));
+    });
+
+    it('should filter jobs by isRemote', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?isRemote=true');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.isRemote === true));
+    });
+
+    it('should filter jobs by salary range', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?salaryMin=90000');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.salaryMin >= 90000));
+    });
+
+    it('should handle pagination correctly', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?page=1&limit=2');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 2);
+      assert.strictEqual(res.body.meta.page, 1);
+      assert.strictEqual(res.body.meta.limit, 2);
+      assert.strictEqual(res.body.meta.hasNextPage, true);
+    });
+
+    it('should return empty array when no jobs match filters', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=NonexistentJobTitle');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 0);
+      assert.strictEqual(res.body.meta.total, 0);
+    });
+
+    it('should reject invalid jobType with 400', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?jobType=INVALID_TYPE');
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    it('should reject invalid page number with 400', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?page=0');
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    it('should reject limit exceeding maximum with 400', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?limit=101');
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    it('should only return OPEN jobs by default', async () => {
+      await prisma.job.update({
+        where: { id: searchJob3.id },
+        data: { status: 'CLOSED' },
+      });
+
+      const res = await request(app).get('/api/v1/jobs/search');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(!res.body.data.some((j: any) => j.id === searchJob3.id));
+
+      await prisma.job.update({
+        where: { id: searchJob3.id },
+        data: { status: 'OPEN' },
+      });
+    });
+
+    it('should exclude expired jobs from search results', async () => {
+      const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await prisma.job.update({
+        where: { id: searchJob3.id },
+        data: { deadline: new Date(pastDate) },
+      });
+
+      const res = await request(app).get('/api/v1/jobs/search');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(!res.body.data.some((j: any) => j.id === searchJob3.id));
+
+      const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await prisma.job.update({
+        where: { id: searchJob3.id },
+        data: { deadline: new Date(futureDate) },
+      });
+    });
+
+    it('should filter by status parameter', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?status=OPEN');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.status === 'OPEN'));
+    });
+
+    it('should combine keyword with jobType filter', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=Engineer&jobType=FULL_TIME');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => 
+        (j.title.includes('Engineer') || j.description.includes('Engineer')) && 
+        j.jobType === 'FULL_TIME'
+      ));
+    });
+
+    it('should combine location with isRemote filter', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?location=Remote&isRemote=true');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => 
+        j.location.toLowerCase().includes('remote') && j.isRemote === true
+      ));
+    });
+
+    it('should combine experienceLevel with salary range', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?experienceLevel=SENIOR&salaryMin=100000');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => 
+        j.experienceLevel === 'SENIOR' && j.salaryMin >= 100000
+      ));
+    });
+
+    it('should combine multiple filters: keyword, jobType, experienceLevel', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=Backend&jobType=FULL_TIME&experienceLevel=SENIOR');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => 
+        (j.title.includes('Backend') || j.description.includes('Backend')) &&
+        j.jobType === 'FULL_TIME' &&
+        j.experienceLevel === 'SENIOR'
+      ));
+    });
+
+    it('should return empty result with conflicting filters', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?jobType=FULL_TIME&experienceLevel=ENTRY');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 0);
+      assert.strictEqual(res.body.meta.total, 0);
+    });
+
+    it('should return empty result with high salary filter', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?salaryMin=500000');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 0);
+      assert.strictEqual(res.body.meta.total, 0);
+    });
+
+    it('should return empty result with non-existent location', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?location=NonExistentCity');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 0);
+      assert.strictEqual(res.body.meta.total, 0);
+    });
+
+    it('should handle salary range with both min and max', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?salaryMin=90000&salaryMax=150000');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => 
+        j.salaryMin >= 90000 && j.salaryMax <= 150000
+      ));
+    });
+
+    it('should filter by isRemote=false correctly', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?isRemote=false');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.data.every((j: any) => j.isRemote === false));
+    });
+
+    it('should combine all filters together', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?keyword=Engineer&jobType=FULL_TIME&experienceLevel=SENIOR&isRemote=true&salaryMin=100000');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      if (res.body.data.length > 0) {
+        assert.ok(res.body.data.every((j: any) => 
+          (j.title.includes('Engineer') || j.description.includes('Engineer')) &&
+          j.jobType === 'FULL_TIME' &&
+          j.experienceLevel === 'SENIOR' &&
+          j.isRemote === true &&
+          j.salaryMin >= 100000
+        ));
+      }
+    });
+
+    it('should handle pagination with filters', async () => {
+      const res = await request(app).get('/api/v1/jobs/search?jobType=FULL_TIME&page=1&limit=1');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.length, 1);
+      assert.strictEqual(res.body.meta.page, 1);
+      assert.strictEqual(res.body.meta.limit, 1);
+      assert.ok(res.body.data.every((j: any) => j.jobType === 'FULL_TIME'));
+    });
+  });
 });
