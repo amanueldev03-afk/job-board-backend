@@ -1,137 +1,124 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const companySchema = new mongoose.Schema({
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: [true, 'User reference is required'],
-        unique: true
+const Company = sequelize.define('Company', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        unique: true,
+        field: 'user_id'
     },
     companyName: {
-        type: String,
-        required: [true, 'Company name is required'],
+        type: DataTypes.STRING,
+        allowNull: false,
         unique: true,
-        trim: true,
-        maxlength: [100, 'Company name cannot exceed 100 characters']
+        validate: {
+            len: [1, 100]
+        },
+        field: 'company_name'
     },
     description: {
-        type: String,
-        required: [true, 'Company description is required'],
-        maxlength: [2000, 'Description cannot exceed 2000 characters']
+        type: DataTypes.TEXT,
+        allowNull: false,
+        validate: {
+            len: [1, 2000]
+        }
     },
     website: {
-        type: String,
-        match: [/^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/, 'Please enter a valid URL']
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+            isUrl: true
+        }
     },
     location: {
-        address: {
-            type: String,
-            required: [true, 'Address is required']
-        },
-        city: {
-            type: String,
-            required: true
-        },
-        state: String,
-        country: {
-            type: String,
-            required: true,
-            default: 'USA'
-        },
-        zipCode: String
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {
+            address: '',
+            city: '',
+            state: '',
+            country: 'USA',
+            zipCode: ''
+        }
     },
     logo: {
-        type: String,
-        default: 'default-company-logo.png'
+        type: DataTypes.STRING,
+        defaultValue: 'default-company-logo.png'
     },
     industry: {
-        type: String,
-        required: [true, 'Industry is required'],
-        enum: ['Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing', 'Construction', 'Hospitality', 'Other']
+        type: DataTypes.ENUM('Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing', 'Construction', 'Hospitality', 'Other'),
+        allowNull: false
     },
     companySize: {
-        type: String,
-        enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+']
+        type: DataTypes.ENUM('1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'),
+        allowNull: true,
+        field: 'company_size'
     },
     foundedYear: {
-        type: Number,
-        min: 1800,
-        max: new Date().getFullYear()
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: {
+            min: 1800,
+            max: new Date().getFullYear()
+        },
+        field: 'founded_year'
     },
-    benefits: [{
-        type: String,
-        enum: ['Health Insurance', '401k', 'Remote Work', 'Flexible Hours', 'Paid Time Off', 'Stock Options', 'Tuition Reimbursement']
-    }],
+    benefits: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: true,
+        defaultValue: []
+    },
     isVerified: {
-        type: Boolean,
-        default: false
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        field: 'is_verified'
     },
     isActive: {
-        type: Boolean,
-        default: true
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        field: 'is_active'
     },
     rating: {
-        average: {
-            type: Number,
-            default: 0,
-            min: 0,
-            max: 5
-        },
-        count: {
-            type: Number,
-            default: 0
+        type: DataTypes.JSONB,
+        defaultValue: {
+            average: 0,
+            count: 0
         }
     }
 }, {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-});
-
-companySchema.index({ companyName: 'text' });
-companySchema.index({ industry: 1 });
-companySchema.index({ 'location.city': 1, 'location.country': 1 });
-
-companySchema.pre('save', function() {
-    if (this.isModified('companyName')) {
-        this.companyName = this.companyName.split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
+    tableName: 'companies',
+    hooks: {
+        beforeSave: (company) => {
+            if (company.changed('companyName')) {
+                company.companyName = company.companyName.split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+            }
+        }
     }
 });
 
-companySchema.methods.getJobCount = async function() {
-    const Job = mongoose.model('Job');
-    return await Job.countDocuments({ company: this._id, isActive: true });
+Company.prototype.getJobCount = async function() {
+    const { Job } = require('./index');
+    return await Job.count({ where: { companyId: this.id, isActive: true } });
 };
 
-companySchema.methods.updateRating = async function(newRating) {
+Company.prototype.updateRating = async function(newRating) {
     const total = (this.rating.average * this.rating.count) + newRating;
     this.rating.count += 1;
     this.rating.average = total / this.rating.count;
     return await this.save();
 };
 
-companySchema.statics.findByIndustry = function(industry) {
-    return this.find({ industry: industry, isActive: true });
+Company.findByIndustry = function(industry) {
+    return this.findAll({ where: { industry, isActive: true } });
 };
 
-companySchema.statics.search = function(searchTerm) {
-    return this.find(
-        { $text: { $search: searchTerm }, isActive: true },
-        { score: { $meta: 'textScore' } }
-    ).sort({ score: { $meta: 'textScore' } });
-};
-
-companySchema.virtual('jobs', {
-    ref: 'Job',
-    localField: '_id',
-    foreignField: 'company'
-});
-
-companySchema.virtual('fullAddress').get(function() {
-    const parts = [this.location.address, this.location.city, this.location.state, this.location.zipCode, this.location.country].filter(Boolean);
-    return parts.join(', ');
-});
-
-module.exports = mongoose.model('Company', companySchema);
+module.exports = Company;

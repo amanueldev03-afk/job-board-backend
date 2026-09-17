@@ -1,10 +1,26 @@
-const mongoose = require('mongoose');
 const User = require('./User');
 const Company = require('./Company');
 const Job = require('./Job');
 const Application = require('./Application');
+const RefreshToken = require('./RefreshToken');
+const { sequelize } = require('../config/db');
 
 const initializeRelations = () => {
+    User.hasOne(Company, { foreignKey: 'userId', as: 'company' });
+    Company.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+    Company.hasMany(Job, { foreignKey: 'companyId', as: 'jobs' });
+    Job.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+    Job.hasMany(Application, { foreignKey: 'jobId', as: 'applications' });
+    Application.belongsTo(Job, { foreignKey: 'jobId', as: 'job' });
+
+    User.hasMany(Application, { foreignKey: 'candidateId', as: 'applications' });
+    Application.belongsTo(User, { foreignKey: 'candidateId', as: 'candidate' });
+
+    User.hasMany(RefreshToken, { foreignKey: 'userId', as: 'refreshTokens' });
+    RefreshToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
     console.log('✅ Model relationships initialized');
 };
 
@@ -13,21 +29,10 @@ const getModel = (modelName) => {
         User,
         Company,
         Job,
-        Application
+        Application,
+        RefreshToken
     };
     return models[modelName];
-};
-
-const connect = async (MONGO_URI) => {
-    try {
-        await mongoose.connect(MONGO_URI);
-        console.log('✅ MongoDB connected successfully');
-        initializeRelations();
-        return true;
-    } catch (error) {
-        console.error('❌ MongoDB connection error:', error.message);
-        throw error;
-    }
 };
 
 module.exports = {
@@ -35,7 +40,8 @@ module.exports = {
     Company,
     Job,
     Application,
+    RefreshToken,
+    sequelize,
     getModel,
-    connect,
     initializeRelations
 };

@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -8,7 +7,7 @@ const path = require('path');
 
 // ============ CONFIGURATION IMPORTS ============
 const env = require('./config/env');
-const connectDB = require('./config/db');
+const { connectDB, sequelize } = require('./config/db');
 const jwtConfig = require('./config/jwtConfig');
 
 // ============ MODEL IMPORTS ============
@@ -83,7 +82,7 @@ app.get('/health', (req, res) => {
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         environment: env.NODE_ENV,
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+        database: sequelize.connectionManager?.isConnected ? 'connected' : 'disconnected'
     });
 });
 
@@ -109,7 +108,10 @@ app.use('/api/applications', applicationRoutes);
 if (env.NODE_ENV === 'development') {
     app.get('/api/test/users', async (req, res) => {
         try {
-            const users = await User.find().select('-password').limit(5);
+            const users = await User.findAll({ 
+                limit: 5,
+                attributes: { exclude: ['password'] }
+            });
             res.json({ success: true, count: users.length, data: users });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
@@ -118,7 +120,7 @@ if (env.NODE_ENV === 'development') {
 
     app.get('/api/test/companies', async (req, res) => {
         try {
-            const companies = await Company.find().limit(5);
+            const companies = await Company.findAll({ limit: 5 });
             res.json({ success: true, count: companies.length, data: companies });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
@@ -127,7 +129,10 @@ if (env.NODE_ENV === 'development') {
 
     app.get('/api/test/jobs', async (req, res) => {
         try {
-            const jobs = await Job.find().populate('company', 'companyName logo').limit(5);
+            const jobs = await Job.findAll({ 
+                limit: 5,
+                include: [{ model: Company, attributes: ['companyName', 'logo'] }]
+            });
             res.json({ success: true, count: jobs.length, data: jobs });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
@@ -136,10 +141,13 @@ if (env.NODE_ENV === 'development') {
 
     app.get('/api/test/applications', async (req, res) => {
         try {
-            const apps = await Application.find()
-                .populate('job', 'title')
-                .populate('candidate', 'name email')
-                .limit(5);
+            const apps = await Application.findAll({
+                limit: 5,
+                include: [
+                    { model: Job, attributes: ['title'] },
+                    { model: User, as: 'candidate', attributes: ['name', 'email'] }
+                ]
+            });
             res.json({ success: true, count: apps.length, data: apps });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
@@ -156,7 +164,7 @@ if (env.NODE_ENV === 'development') {
             });
 
             const testCompany = await Company.create({
-                user: testUser._id,
+                userId: testUser.id,
                 companyName: 'Test Tech Corp',
                 description: 'A test technology company',
                 location: {
@@ -168,7 +176,7 @@ if (env.NODE_ENV === 'development') {
             });
 
             const testJob = await Job.create({
-                company: testCompany._id,
+                companyId: testCompany.id,
                 title: 'Test Developer',
                 description: 'This is a test job posting for verification purposes.',
                 requirements: ['JavaScript', 'Testing'],
@@ -189,10 +197,10 @@ if (env.NODE_ENV === 'development') {
     app.get('/api/test/stats', async (req, res) => {
         try {
             const [userCount, companyCount, jobCount, applicationCount] = await Promise.all([
-                User.countDocuments(),
-                Company.countDocuments(),
-                Job.countDocuments(),
-                Application.countDocuments()
+                User.count(),
+                Company.count(),
+                Job.count(),
+                Application.count()
             ]);
 
             res.json({
@@ -261,12 +269,11 @@ process.on('unhandledRejection', (err) => {
     process.exit(1);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.log('SIGTERM received. Closing server...');
-    mongoose.connection.close(() => {
-        console.log('MongoDB connection closed');
-        process.exit(0);
-    });
+    await sequelize.close();
+    console.log('PostgreSQL connection closed');
+    process.exit(0);
 });
 
 startServer();

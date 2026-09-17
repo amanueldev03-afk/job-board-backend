@@ -1,122 +1,141 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
-const validator = require('validator');
+const { sequelize } = require('../config/db');
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
     email: {
-        type: String,
-        required: [true, 'Email is required'],
+        type: DataTypes.STRING,
+        allowNull: false,
         unique: true,
-        lowercase: true,
-        trim: true,
-        validate: [validator.isEmail, 'Please provide a valid email']
+        validate: {
+            isEmail: true
+        }
     },
     password: {
-        type: String,
-        required: [true, 'Password is required'],
-        minlength: [6, 'Password must be at least 6 characters'],
-        select: false
+        type: DataTypes.STRING,
+        allowNull: false,
+        validate: {
+            len: [6, 255]
+        }
     },
     name: {
-        type: String,
-        required: [true, 'Name is required'],
-        trim: true,
-        maxlength: [50, 'Name cannot exceed 50 characters']
+        type: DataTypes.STRING,
+        allowNull: false,
+        validate: {
+            len: [1, 50]
+        }
     },
     role: {
-        type: String,
-        enum: ['candidate', 'company', 'admin'],
-        default: 'candidate'
+        type: DataTypes.ENUM('candidate', 'company', 'admin'),
+        defaultValue: 'candidate'
     },
     avatar: {
-        type: String,
-        default: 'default-avatar.png'
+        type: DataTypes.STRING,
+        defaultValue: 'default-avatar.png'
     },
-   googleId: {
-    type: String,
-    unique: true,
-    sparse: true
+    googleId: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: true
     },
-   authProvider: {
-    type: String,
-    enum: ['local', 'google', 'facebook'],
-    default: 'local'
- },
- loginAttempts: {
-    type: Number,
-    default: 0
-},
-lockUntil: {
-    type: Date,
-    default: null
-},
+    authProvider: {
+        type: DataTypes.ENUM('local', 'google', 'facebook'),
+        defaultValue: 'local'
+    },
+    loginAttempts: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    lockUntil: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
     emailPreferences: {
-    type: {
-        marketing: { type: Boolean, default: true },
-        applicationUpdates: { type: Boolean, default: true },
-        jobAlerts: { type: Boolean, default: true }
+        type: DataTypes.JSONB,
+        defaultValue: {
+            marketing: true,
+            applicationUpdates: true,
+            jobAlerts: true
+        }
     },
-    default: {
-        marketing: true,
-        applicationUpdates: true,
-        jobAlerts: true
-    }
-},
     isActive: {
-        type: Boolean,
-        default: true
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
     },
-    isVerified: { type: Boolean, default: false },
-    emailVerificationToken: String,
-    emailVerificationExpires: Date,
+    isVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    emailVerificationToken: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    emailVerificationExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
     lastLogin: {
-        type: Date
+        type: DataTypes.DATE,
+        allowNull: true
     },
-    passwordResetToken: String,
-    passwordResetExpires: Date , 
-    
-    // Add after isVerified field (around line 40-50)
+    passwordResetToken: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    passwordResetExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
     deletionRequested: {
-        type: Boolean,
-        default: false
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     },
     deletionToken: {
-        type: String,
-        default: null
+        type: DataTypes.STRING,
+        allowNull: true
     },
     deletionExpires: {
-        type: Date,
-        default: null
+        type: DataTypes.DATE,
+        allowNull: true
     },
     scheduledDeletionDate: {
-        type: Date,
-        default: null
+        type: DataTypes.DATE,
+        allowNull: true
     }
-},
-
-{
-    timestamps: true
+}, {
+    timestamps: true,
+    tableName: 'users',
+    hooks: {
+        beforeCreate: async (user) => {
+            if (user.password) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
+        },
+        beforeUpdate: async (user) => {
+            if (user.changed('password')) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
+        }
+    }
 });
 
-userSchema.pre('save', async function() {
-    if (!this.isModified('password')) {
-        return;
-    }
-    
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-});
-
-userSchema.methods.comparePassword = async function(enteredPassword) {
+User.prototype.comparePassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-userSchema.methods.generatePasswordResetToken = function() {
+User.prototype.generatePasswordResetToken = function() {
     const crypto = require('crypto');
     const resetToken = crypto.randomBytes(32).toString('hex');
     this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+    this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
     return resetToken;
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = User;

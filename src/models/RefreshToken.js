@@ -1,41 +1,53 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const refreshTokenSchema = new mongoose.Schema({
+const RefreshToken = sequelize.define('RefreshToken', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
     token: {
-        type: String,
-        required: true,
+        type: DataTypes.STRING,
+        allowNull: false,
         unique: true
     },
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+    userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: 'user_id'
     },
     expiresAt: {
-        type: Date,
-        required: true
+        type: DataTypes.DATE,
+        allowNull: false,
+        field: 'expires_at'
     },
     revoked: {
-        type: Boolean,
-        default: false
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     },
     deviceInfo: {
-        type: String,
-        default: null
+        type: DataTypes.STRING,
+        allowNull: true,
+        field: 'device_info'
     },
     ipAddress: {
-        type: String,
-        default: null
+        type: DataTypes.STRING,
+        allowNull: true,
+        field: 'ip_address'
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    tableName: 'refresh_tokens',
+    indexes: [
+        {
+            unique: true,
+            fields: ['token']
+        },
+        {
+            fields: ['user_id']
+        }
+    ]
 });
 
-// Remove this duplicate index - already defined by unique: true
-// refreshTokenSchema.index({ token: 1 });
-
-// Keep these indexes (not duplicates)
-refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-refreshTokenSchema.index({ user: 1 });
-
-module.exports = mongoose.model('RefreshToken', refreshTokenSchema);
+module.exports = RefreshToken;

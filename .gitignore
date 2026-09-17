@@ -1,7 +1,5 @@
-
 # Dependencies
 node_modules/
-package-lock.json
 
 # Environment variables
 .env
@@ -24,10 +22,12 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+.claude/
+.windsurf/
 *.swp
 *.swo
 
-# Uploads (keep structure but not files)
+# Uploads (keep directory structure but ignore files)
 uploads/*/
 !uploads/*/.gitkeep
 
@@ -41,10 +41,6 @@ coverage/
 # Temporary files
 tmp/
 temp/
-EOF
 
-# Create .gitkeep for uploads folders
-touch uploads/avatars/.gitkeep
-touch uploads/resumes/.gitkeep
-touch uploads/logos/.gitkeep
-touch uploads/covers/.gitkeep
+# Generated files
+/src/generated/prisma

@@ -1,111 +1,107 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const applicationSchema = new mongoose.Schema({
-    job: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Job',
-        required: [true, 'Job reference is required']
+const Application = sequelize.define('Application', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
     },
-    candidate: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: [true, 'Candidate reference is required']
+    jobId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: 'job_id'
+    },
+    candidateId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: 'candidate_id'
     },
     status: {
-        type: String,
-        enum: ['pending', 'reviewed', 'shortlisted', 'rejected', 'hired', 'withdrawn'],
-        default: 'pending'
+        type: DataTypes.ENUM('pending', 'reviewed', 'shortlisted', 'rejected', 'hired', 'withdrawn'),
+        defaultValue: 'pending'
     },
     documents: {
-        resume: {
-            type: String,
-            required: [true, 'Resume is required']
-        },
-        coverLetter: {
-            type: String,
-            maxlength: [2000, 'Cover letter cannot exceed 2000 characters']
-        },
-        portfolio: {
-            type: String,
-            validate: {
-                validator: function(v) {
-                    return !v || /^(https?:\/\/)/.test(v);
-                },
-                message: 'Please provide a valid URL'
-            }
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {
+            resume: '',
+            coverLetter: '',
+            portfolio: ''
         }
     },
     companyNotes: {
-        type: String,
-        maxlength: [1000, 'Notes cannot exceed 1000 characters']
+        type: DataTypes.TEXT,
+        allowNull: true,
+        validate: {
+            len: [0, 1000]
+        },
+        field: 'company_notes'
     },
     interviewDetails: {
-        scheduled: {
-            type: Boolean,
-            default: false
+        type: DataTypes.JSONB,
+        defaultValue: {
+            scheduled: false,
+            date: null,
+            type: null,
+            meetingLink: '',
+            notes: '',
+            feedback: ''
         },
-        date: Date,
-        type: {
-            type: String,
-            enum: ['phone', 'video', 'onsite', 'technical']
-        },
-        meetingLink: String,
-        notes: String,
-        feedback: String
+        field: 'interview_details'
     },
-    timeline: [{
-        status: {
-            type: String,
-            enum: ['pending', 'reviewed', 'shortlisted', 'rejected', 'hired', 'withdrawn']
-        },
-        timestamp: {
-            type: Date,
-            default: Date.now
-        },
-        note: String,
-        updatedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
-        }
-    }],
+    timeline: {
+        type: DataTypes.JSONB,
+        defaultValue: []
+    },
     rating: {
-        type: Number,
-        min: 1,
-        max: 5
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: {
+            min: 1,
+            max: 5
+        }
     },
-    viewedAt: Date,
-    respondedAt: Date
+    viewedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'viewed_at'
+    },
+    respondedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'responded_at'
+    }
 }, {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-});
-
-applicationSchema.index({ job: 1, candidate: 1 }, { unique: true });
-applicationSchema.index({ job: 1, status: 1 });
-applicationSchema.index({ candidate: 1, createdAt: -1 });
-applicationSchema.index({ status: 1, createdAt: 1 });
-applicationSchema.index({ 'interviewDetails.scheduled': 1, 'interviewDetails.date': 1 });
-
-applicationSchema.pre('save', function() {
-    if (this.isModified('status')) {
-        this.timeline.push({
-            status: this.status,
-            timestamp: new Date(),
-            note: this.companyNotes
-        });
-        
-        if (this.status !== 'pending' && !this.respondedAt) {
-            this.respondedAt = new Date();
-        }
-        
-        if (this.status === 'reviewed' && !this.viewedAt) {
-            this.viewedAt = new Date();
+    tableName: 'applications',
+    hooks: {
+        beforeSave: (application) => {
+            if (application.changed('status')) {
+                const timelineEntry = {
+                    status: application.status,
+                    timestamp: new Date(),
+                    note: application.companyNotes
+                };
+                
+                if (!application.timeline) {
+                    application.timeline = [];
+                }
+                application.timeline.push(timelineEntry);
+                
+                if (application.status !== 'pending' && !application.respondedAt) {
+                    application.respondedAt = new Date();
+                }
+                
+                if (application.status === 'reviewed' && !application.viewedAt) {
+                    application.viewedAt = new Date();
+                }
+            }
         }
     }
 });
 
-applicationSchema.methods.updateStatus = async function(newStatus, note = '', userId = null) {
+Application.prototype.updateStatus = async function(newStatus, note = '', userId = null) {
     this.status = newStatus;
     
     if (note) this.companyNotes = note;
@@ -120,7 +116,7 @@ applicationSchema.methods.updateStatus = async function(newStatus, note = '', us
     return await this.save();
 };
 
-applicationSchema.methods.scheduleInterview = async function(interviewData) {
+Application.prototype.scheduleInterview = async function(interviewData) {
     this.interviewDetails = {
         scheduled: true,
         date: interviewData.date,
@@ -140,17 +136,17 @@ applicationSchema.methods.scheduleInterview = async function(interviewData) {
     return await this.save();
 };
 
-applicationSchema.methods.addInterviewFeedback = async function(feedback, rating = null) {
+Application.prototype.addInterviewFeedback = async function(feedback, rating = null) {
     this.interviewDetails.feedback = feedback;
     if (rating) this.rating = rating;
     return await this.save();
 };
 
-applicationSchema.methods.canWithdraw = function() {
+Application.prototype.canWithdraw = function() {
     return ['pending', 'reviewed', 'shortlisted'].includes(this.status);
 };
 
-applicationSchema.methods.withdraw = async function(reason = '') {
+Application.prototype.withdraw = async function(reason = '') {
     if (!this.canWithdraw()) {
         throw new Error('Cannot withdraw application at current status');
     }
@@ -165,37 +161,31 @@ applicationSchema.methods.withdraw = async function(reason = '') {
     return await this.save();
 };
 
-applicationSchema.statics.hasApplied = async function(jobId, candidateId) {
-    const application = await this.findOne({ job: jobId, candidate: candidateId });
+Application.hasApplied = async function(jobId, candidateId) {
+    const application = await this.findOne({ where: { jobId, candidateId } });
     return !!application;
 };
 
-applicationSchema.statics.getCompanyApplications = async function(companyId, status = null) {
-    const Job = mongoose.model('Job');
+Application.getCompanyApplications = async function(companyId, status = null) {
+    const { Job } = require('./index');
     
-    const jobs = await Job.find({ company: companyId }).select('_id');
-    const jobIds = jobs.map(job => job._id);
+    const jobs = await Job.findAll({ where: { companyId }, attributes: ['id'] });
+    const jobIds = jobs.map(job => job.id);
     
-    const query = { job: { $in: jobIds } };
-    if (status) query.status = status;
+    const where = { jobId: { [require('sequelize').Op.in]: jobIds } };
+    if (status) where.status = status;
     
-    return await this.find(query)
-        .populate('candidate', 'name email avatar')
-        .populate('job', 'title location compensation.salaryMin compensation.salaryMax')
-        .sort({ createdAt: -1 });
+    return await this.findAll({ 
+        where,
+        order: [['createdAt', 'DESC']]
+    });
 };
 
-applicationSchema.statics.getJobStats = async function(jobId) {
-    const stats = await this.aggregate([
-        { $match: { job: jobId } },
-        { $group: {
-            _id: '$status',
-            count: { $sum: 1 }
-        }}
-    ]);
+Application.getJobStats = async function(jobId) {
+    const applications = await this.findAll({ where: { jobId } });
     
     const result = {
-        total: 0,
+        total: applications.length,
         pending: 0,
         reviewed: 0,
         shortlisted: 0,
@@ -204,61 +194,29 @@ applicationSchema.statics.getJobStats = async function(jobId) {
         withdrawn: 0
     };
     
-    stats.forEach(stat => {
-        result[stat._id] = stat.count;
-        result.total += stat.count;
+    applications.forEach(app => {
+        if (result[app.status] !== undefined) {
+            result[app.status]++;
+        }
     });
     
     return result;
 };
 
-applicationSchema.statics.getByDateRange = async function(startDate, endDate, companyId = null) {
-    let query = { createdAt: { $gte: startDate, $lte: endDate } };
+Application.getByDateRange = async function(startDate, endDate, companyId = null) {
+    const { Job } = require('./index');
+    const { Op } = require('sequelize');
+    
+    const where = {
+        createdAt: { [Op.between]: [startDate, endDate] }
+    };
     
     if (companyId) {
-        const Job = mongoose.model('Job');
-        const jobs = await Job.find({ company: companyId }).select('_id');
-        query.job = { $in: jobs.map(j => j._id) };
+        const jobs = await Job.findAll({ where: { companyId }, attributes: ['id'] });
+        where.jobId = { [Op.in]: jobs.map(j => j.id) };
     }
     
-    return await this.find(query)
-        .populate('job', 'title company')
-        .populate('candidate', 'name email');
+    return await this.findAll({ where });
 };
 
-applicationSchema.virtual('candidateDetails', {
-    ref: 'User',
-    localField: 'candidate',
-    foreignField: '_id',
-    justOne: true
-});
-
-applicationSchema.virtual('jobDetails', {
-    ref: 'Job',
-    localField: 'job',
-    foreignField: '_id',
-    justOne: true
-});
-
-applicationSchema.virtual('timeSinceApplied').get(function() {
-    const minutes = Math.floor((new Date() - this.createdAt) / 60000);
-    if (minutes < 60) return `${minutes} minutes ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} hours ago`;
-    const days = Math.floor(hours / 24);
-    return `${days} days ago`;
-});
-
-applicationSchema.virtual('statusColor').get(function() {
-    const colors = {
-        pending: '#F59E0B',
-        reviewed: '#3B82F6',
-        shortlisted: '#10B981',
-        rejected: '#EF4444',
-        hired: '#8B5CF6',
-        withdrawn: '#6B7280'
-    };
-    return colors[this.status] || '#6B7280';
-});
-
-module.exports = mongoose.model('Application', applicationSchema);
+module.exports = Application;

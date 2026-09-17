@@ -1,311 +1,228 @@
-const mongoose = require('mongoose');
+const { DataTypes, Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const jobSchema = new mongoose.Schema({
-    company: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Company',
-        required: [true, 'Company reference is required']
+const Job = sequelize.define('Job', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    companyId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: 'company_id'
     },
     title: {
-        type: String,
-        required: [true, 'Job title is required'],
-        trim: true,
-        maxlength: [100, 'Title cannot exceed 100 characters']
+        type: DataTypes.STRING,
+        allowNull: false,
+        validate: {
+            len: [1, 100]
+        }
     },
     description: {
-        type: String,
-        required: [true, 'Job description is required'],
-        minlength: [50, 'Description must be at least 50 characters']
+        type: DataTypes.TEXT,
+        allowNull: false,
+        validate: {
+            len: [50, 50000]
+        }
     },
-    requirements: [{
-        type: String,
-        required: true
-    }],
-    responsibilities: [{
-        type: String
-    }],
+    requirements: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: []
+    },
+    responsibilities: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: true,
+        defaultValue: []
+    },
     location: {
-        type: String,
-        required: [true, 'Location is required']
+        type: DataTypes.STRING,
+        allowNull: false
     },
     isRemote: {
-        type: Boolean,
-        default: false
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        field: 'is_remote'
     },
     compensation: {
-        salaryMin: {
-            type: Number,
-            required: true,
-            min: 0
-        },
-        salaryMax: {
-            type: Number,
-            required: true,
-            min: 0,
-            validate: {
-                validator: function(value) {
-                    return value >= this.compensation.salaryMin;
-                },
-                message: 'Maximum salary must be greater than or equal to minimum salary'
-            }
-        },
-        currency: {
-            type: String,
-            default: 'USD',
-            enum: ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
-        },
-        salaryPeriod: {
-            type: String,
-            enum: ['hourly', 'daily', 'weekly', 'monthly', 'yearly'],
-            default: 'yearly'
-        },
-        isNegotiable: {
-            type: Boolean,
-            default: false
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {
+            salaryMin: 0,
+            salaryMax: 0,
+            currency: 'USD',
+            salaryPeriod: 'yearly',
+            isNegotiable: false
         }
     },
     employmentType: {
-        type: String,
-        enum: ['full-time', 'part-time', 'contract', 'internship', 'freelance', 'remote'],
-        required: true
+        type: DataTypes.ENUM('full-time', 'part-time', 'contract', 'internship', 'freelance', 'remote'),
+        allowNull: false,
+        field: 'employment_type'
     },
     experienceLevel: {
-        type: String,
-        enum: ['entry', 'junior', 'mid', 'senior', 'lead', 'executive'],
-        required: true
+        type: DataTypes.ENUM('entry', 'junior', 'mid', 'senior', 'lead', 'executive'),
+        allowNull: false,
+        field: 'experience_level'
     },
-    skills: [{
-        type: String,
-        required: true,
-        lowercase: true,
-        trim: true
-    }],
-    benefits: [{
-        type: String
-    }],
+    skills: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: []
+    },
+    benefits: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: true,
+        defaultValue: []
+    },
     deadline: {
-        type: Date,
-        required: true,
-        validate: {
-            validator: function(value) {
-                return value > new Date();
-            },
-            message: 'Deadline must be in the future'
-        }
+        type: DataTypes.DATE,
+        allowNull: false
     },
     status: {
-        type: String,
-        enum: ['draft', 'published', 'closed', 'expired'],
-        default: 'published'
+        type: DataTypes.ENUM('draft', 'published', 'closed', 'expired'),
+        defaultValue: 'published'
     },
     metadata: {
-        views: {
-            type: Number,
-            default: 0
-        },
-        applications: {
-            type: Number,
-            default: 0
-        },
-        shares: {
-            type: Number,
-            default: 0
-        },
-        featured: {
-            type: Boolean,
-            default: false
-        },
-        urgent: {
-            type: Boolean,
-            default: false
+        type: DataTypes.JSONB,
+        defaultValue: {
+            views: 0,
+            applications: 0,
+            shares: 0,
+            featured: false,
+            urgent: false
         }
     },
     publishedAt: {
-        type: Date,
-        default: Date.now
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'published_at'
     },
-    closedAt: Date
+    closedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'closed_at'
+    },
+    isActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        field: 'is_active'
+    }
 }, {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-});
-
-jobSchema.index({ title: 'text', description: 'text', requirements: 'text', skills: 'text' });
-jobSchema.index({ company: 1, createdAt: -1 });
-jobSchema.index({ status: 1, deadline: 1 });
-jobSchema.index({ employmentType: 1, location: 1 });
-jobSchema.index({ skills: 1, experienceLevel: 1 });
-jobSchema.index({ 'metadata.featured': -1, createdAt: -1 });
-
-jobSchema.pre('save', function() {
-    if (this.deadline < new Date()) {
-        this.status = 'expired';
-    }
-    
-    if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-        this.publishedAt = new Date();
-    }
-    
-    if (this.isModified('status') && this.status === 'closed') {
-        this.closedAt = new Date();
+    tableName: 'jobs',
+    hooks: {
+        beforeSave: (job) => {
+            if (job.deadline < new Date()) {
+                job.status = 'expired';
+            }
+            if (job.changed('status') && job.status === 'published' && !job.publishedAt) {
+                job.publishedAt = new Date();
+            }
+            if (job.changed('status') && job.status === 'closed') {
+                job.closedAt = new Date();
+            }
+        }
     }
 });
 
-jobSchema.methods.isExpired = function() {
+Job.prototype.isExpired = function() {
     return this.deadline < new Date();
 };
 
-jobSchema.methods.isAcceptingApplications = function() {
+Job.prototype.isAcceptingApplications = function() {
     return this.status === 'published' && !this.isExpired();
 };
 
-jobSchema.methods.incrementViews = async function() {
+Job.prototype.incrementViews = async function() {
     this.metadata.views += 1;
     return await this.save();
 };
 
-jobSchema.methods.incrementApplications = async function() {
+Job.prototype.incrementApplications = async function() {
     this.metadata.applications += 1;
     return await this.save();
 };
 
-jobSchema.methods.close = async function() {
+Job.prototype.close = async function() {
     this.status = 'closed';
     this.closedAt = new Date();
     return await this.save();
 };
 
-jobSchema.methods.getSalaryRange = function() {
-    const { salaryMin, salaryMax, currency, salaryPeriod } = this.compensation;
-    const formatSalary = (num) => {
-        if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-        if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-        return num.toString();
-    };
-    
-    const periodMap = {
-        hourly: '/hr',
-        daily: '/day',
-        weekly: '/week',
-        monthly: '/mo',
-        yearly: '/yr'
-    };
-    
-    return `${currency} ${formatSalary(salaryMin)} - ${formatSalary(salaryMax)}${periodMap[salaryPeriod]}`;
-};
-
-jobSchema.statics.findActive = function() {
-    return this.find({
-        status: 'published',
-        deadline: { $gt: new Date() }
+Job.findActive = function() {
+    return this.findAll({
+        where: {
+            status: 'published',
+            deadline: { [Op.gt]: new Date() }
+        }
     });
 };
 
-jobSchema.statics.searchWithFilters = function(filters) {
-    let query = {};
-    
-    if (filters.search) {
-        query.$text = { $search: filters.search };
-    }
-    
-    if (filters.location) {
-        query.location = { $regex: filters.location, $options: 'i' };
-    }
-    
-    if (filters.employmentType) {
-        query.employmentType = filters.employmentType;
-    }
-    
-    if (filters.experienceLevel) {
-        query.experienceLevel = filters.experienceLevel;
-    }
-    
-    if (filters.skills && filters.skills.length) {
-        query.skills = { $in: filters.skills };
-    }
-    
-    if (filters.minSalary) {
-        query['compensation.salaryMax'] = { $gte: filters.minSalary };
-    }
-    
-    if (filters.isRemote !== undefined) {
-        query.isRemote = filters.isRemote;
-    }
-    
-    query.status = 'published';
-    query.deadline = { $gt: new Date() };
-    
-    return this.find(query);
-};
-
-jobSchema.statics.getStatistics = async function(companyId = null) {
-    const matchStage = companyId ? { company: companyId } : {};
-    
-    const stats = await this.aggregate([
-        { $match: matchStage },
-        { $group: {
-            _id: null,
-            totalJobs: { $sum: 1 },
-            activeJobs: {
-                $sum: {
-                    $cond: [
-                        { $and: [
-                            { $eq: ['$status', 'published'] },
-                            { $gt: ['$deadline', new Date()] }
-                        ]},
-                        1, 0
-                    ]
-                }
-            },
-            totalViews: { $sum: '$metadata.views' },
-            totalApplications: { $sum: '$metadata.applications' },
-            avgSalaryMin: { $avg: '$compensation.salaryMin' },
-            avgSalaryMax: { $avg: '$compensation.salaryMax' }
-        }}
-    ]);
-    
-    return stats[0] || {
-        totalJobs: 0,
-        activeJobs: 0,
-        closedJobs: 0,
-        totalViews: 0,
-        totalApplications: 0,
-        avgSalaryRange: '0 - 0'
+Job.searchWithFilters = function(filters) {
+    const where = {
+        status: 'published',
+        deadline: { [Op.gt]: new Date() }
     };
+
+    if (filters.location) {
+        where.location = { [Op.iLike]: `%${filters.location}%` };
+    }
+    if (filters.employmentType) {
+        where.employmentType = filters.employmentType;
+    }
+    if (filters.experienceLevel) {
+        where.experienceLevel = filters.experienceLevel;
+    }
+    if (filters.skills && filters.skills.length) {
+        where.skills = { [Op.overlap]: filters.skills };
+    }
+    if (filters.minSalary) {
+        where['compensation.salaryMax'] = { [Op.gte]: filters.minSalary };
+    }
+    if (filters.isRemote !== undefined) {
+        where.isRemote = filters.isRemote;
+    }
+
+    return this.findAll({ where });
 };
 
-jobSchema.statics.getTopSkills = async function(limit = 10) {
-    return await this.aggregate([
-        { $match: { status: 'published' } },
-        { $unwind: '$skills' },
-        { $group: { _id: '$skills', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: limit },
-        { $project: { skill: '$_id', count: 1, _id: 0 } }
-    ]);
+Job.getStatistics = async function(companyId = null) {
+    const where = companyId ? { companyId } : {};
+    
+    const jobs = await this.findAll({ where });
+    
+    const stats = {
+        totalJobs: jobs.length,
+        activeJobs: jobs.filter(j => j.status === 'published' && j.deadline > new Date()).length,
+        closedJobs: jobs.filter(j => j.status === 'closed').length,
+        totalViews: jobs.reduce((sum, j) => sum + (j.metadata?.views || 0), 0),
+        totalApplications: jobs.reduce((sum, j) => sum + (j.metadata?.applications || 0), 0),
+        avgSalaryMin: jobs.length ? jobs.reduce((sum, j) => sum + (j.compensation?.salaryMin || 0), 0) / jobs.length : 0,
+        avgSalaryMax: jobs.length ? jobs.reduce((sum, j) => sum + (j.compensation?.salaryMax || 0), 0) / jobs.length : 0
+    };
+    
+    return stats;
 };
 
-jobSchema.virtual('companyDetails', {
-    ref: 'Company',
-    localField: 'company',
-    foreignField: '_id',
-    justOne: true
-});
+Job.getTopSkills = async function(limit = 10) {
+    const jobs = await this.findAll({
+        where: { status: 'published' },
+        attributes: ['skills']
+    });
+    
+    const skillCounts = {};
+    jobs.forEach(job => {
+        (job.skills || []).forEach(skill => {
+            skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+        });
+    });
+    
+    return Object.entries(skillCounts)
+        .map(([skill, count]) => ({ skill, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+};
 
-jobSchema.virtual('applications', {
-    ref: 'Application',
-    localField: '_id',
-    foreignField: 'job'
-});
-
-jobSchema.virtual('daysRemaining').get(function() {
-    const remaining = this.deadline - new Date();
-    return Math.max(0, Math.ceil(remaining / (1000 * 60 * 60 * 24)));
-});
-
-jobSchema.virtual('isHot').get(function() {
-    return this.metadata.views > 100 || this.metadata.urgent;
-});
-
-module.exports = mongoose.model('Job', jobSchema);
+module.exports = Job;
