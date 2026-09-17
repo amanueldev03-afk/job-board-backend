@@ -57,89 +57,89 @@ enum JobStatus {
 }
 
 model User {
-  id                    String    @id @default(uuid())
-  email                 String    @unique
-  password              String
-  name                  String
-  role                  Role      @default(CANDIDATE)
-  avatar                String?
-  googleId              String?   @unique
-  authProvider          AuthProvider @default(LOCAL)
-  loginAttempts         Int       @default(0)
-  lockUntil             DateTime?
-  emailPreferences      Json      @default("{\"marketing\":true,\"applicationUpdates\":true,\"jobAlerts\":true}")
-  isActive              Boolean   @default(true)
-  isVerified            Boolean   @default(false)
-  emailVerificationToken String?
+  id                       String       @id @default(uuid())
+  email                    String       @unique
+  password                 String
+  name                     String
+  role                     Role         @default(CANDIDATE)
+  avatar                   String?
+  googleId                 String?      @unique
+  authProvider             AuthProvider @default(LOCAL)
+  loginAttempts            Int          @default(0)
+  lockUntil                DateTime?
+  emailPreferences         Json         @default("{\"marketing\":true,\"applicationUpdates\":true,\"jobAlerts\":true}")
+  isActive                 Boolean      @default(true)
+  isVerified               Boolean      @default(false)
+  emailVerificationToken   String?
   emailVerificationExpires DateTime?
-  lastLogin             DateTime?
-  passwordResetToken    String?
-  passwordResetExpires  DateTime?
-  deletionRequested     Boolean   @default(false)
-  deletionToken         String?
-  deletionExpires       DateTime?
-  scheduledDeletionDate DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  lastLogin                DateTime?
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
+  deletionRequested        Boolean      @default(false)
+  deletionToken            String?
+  deletionExpires          DateTime?
+  scheduledDeletionDate    DateTime?
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
 
-  company               Company?
-  applications          Application[]
-  refreshTokens         RefreshToken[]
+  company       Company?
+  applications  Application[]
+  refreshTokens RefreshToken[]
 
   @@index([email])
   @@index([googleId])
 }
 
 model Company {
-  id                    String    @id @default(uuid())
-  userId                String    @unique
-  companyName           String    @unique
-  description           String
-  website               String?
-  location              Json
-  logo                  String?
-  industry              String
-  companySize           String?
-  foundedYear           Int?
-  benefits              String[]
-  isVerified            Boolean   @default(false)
-  isActive              Boolean   @default(true)
-  rating                Json      @default("{\"average\":0,\"count\":0}")
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  companyName String   @unique
+  description String
+  website     String?
+  location    Json
+  logo        String?
+  industry    String
+  companySize String?
+  foundedYear Int?
+  benefits    String[]
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  rating      Json     @default("{\"average\":0,\"count\":0}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs                  Job[]
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs Job[]
 
   @@index([userId])
   @@index([companyName])
 }
 
 model Job {
-  id                    String    @id @default(uuid())
-  companyId             String
-  title                 String
-  description           String
-  requirements          String[]
-  responsibilities      String[]
-  location              String
-  isRemote              Boolean   @default(false)
-  compensation           Json
-  employmentType        EmploymentType
-  experienceLevel       ExperienceLevel
-  skills                String[]
-  benefits              String[]
-  deadline              DateTime
-  status                JobStatus @default(PUBLISHED)
-  metadata              Json      @default("{\"views\":0,\"applications\":0,\"shares\":0,\"featured\":false,\"urgent\":false}")
-  publishedAt           DateTime?
-  closedAt              DateTime?
-  isActive              Boolean   @default(true)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id               String          @id @default(uuid())
+  companyId        String
+  title            String
+  description      String
+  requirements     String[]
+  responsibilities String[]
+  location         String
+  isRemote         Boolean         @default(false)
+  compensation     Json
+  employmentType   EmploymentType
+  experienceLevel  ExperienceLevel
+  skills           String[]
+  benefits         String[]
+  deadline         DateTime
+  status           JobStatus       @default(PUBLISHED)
+  metadata         Json            @default("{\"views\":0,\"applications\":0,\"shares\":0,\"featured\":false,\"urgent\":false}")
+  publishedAt      DateTime?
+  closedAt         DateTime?
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  applications          Application[]
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applications Application[]
 
   @@index([companyId])
   @@index([status])
@@ -147,22 +147,22 @@ model Job {
 }
 
 model Application {
-  id                    String    @id @default(uuid())
-  jobId                 String
-  candidateId           String
-  status                ApplicationStatus @default(PENDING)
-  documents             Json      @default("{\"resume\":\"\",\"coverLetter\":\"\",\"portfolio\":\"\"}")
-  companyNotes          String?
-  interviewDetails      Json      @default("{\"scheduled\":false,\"date\":null,\"type\":null,\"meetingLink\":\"\",\"notes\":\"\",\"feedback\":\"\"}")
-  timeline              Json      @default("[]")
-  rating                Int?
-  viewedAt              DateTime?
-  respondedAt           DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id               String            @id @default(uuid())
+  jobId            String
+  candidateId      String
+  status           ApplicationStatus @default(PENDING)
+  documents        Json              @default("{\"resume\":\"\",\"coverLetter\":\"\",\"portfolio\":\"\"}")
+  companyNotes     String?
+  interviewDetails Json              @default("{\"scheduled\":false,\"date\":null,\"type\":null,\"meetingLink\":\"\",\"notes\":\"\",\"feedback\":\"\"}")
+  timeline         Json              @default("[]")
+  rating           Int?
+  viewedAt         DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  job                   Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  candidate             User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -171,17 +171,17 @@ model Application {
 }
 
 model RefreshToken {
-  id                    String    @id @default(uuid())
-  token                 String    @unique
-  userId                String
-  expiresAt             DateTime
-  revoked               Boolean   @default(false)
-  deviceInfo            String?
-  ipAddress             String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
+  deviceInfo String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])

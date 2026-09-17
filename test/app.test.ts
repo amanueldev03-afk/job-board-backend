@@ -27,8 +27,10 @@ import {
 } from '../src/utils/response';
 import { JwtTokenPayload } from '../src/types/auth';
 
+import { checkDatabaseConnection } from '../src/lib/prisma';
+
 describe('Job Board Platform Modular Architecture Test Suite', () => {
-  describe('1. Environment Configuration', () => {
+  describe('1. Environment & Database Configuration', () => {
     it('should validate environment variables successfully', () => {
       assert.doesNotThrow(() => {
         validateEnv();
@@ -37,6 +39,29 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
       assert.strictEqual(typeof config.nodeEnv, 'string');
       assert.strictEqual(typeof config.databaseUrl, 'string');
       assert.strictEqual(typeof config.jwtSecret, 'string');
+    });
+
+    it('should fail validation when DATABASE_URL has invalid protocol', () => {
+      const originalDbUrl = process.env.DATABASE_URL;
+      try {
+        process.env.DATABASE_URL = 'mongodb://localhost:27017/job_board';
+        assert.throws(
+          () => validateEnv(),
+          /Invalid DATABASE_URL protocol/
+        );
+      } finally {
+        process.env.DATABASE_URL = originalDbUrl;
+      }
+    });
+
+    it('should perform database connection health check', async () => {
+      const dbStatus = await checkDatabaseConnection();
+      assert.strictEqual(typeof dbStatus.connected, 'boolean');
+      if (dbStatus.connected) {
+        assert.strictEqual(typeof dbStatus.latencyMs, 'number');
+      } else {
+        assert.strictEqual(typeof dbStatus.error, 'string');
+      }
     });
   });
 

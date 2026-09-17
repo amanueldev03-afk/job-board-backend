@@ -5,8 +5,8 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://localhost:5432/job_board',
-  jwtSecret: process.env.JWT_SECRET || 'change_this_in_production',
+  databaseUrl: process.env.DATABASE_URL || '',
+  jwtSecret: process.env.JWT_SECRET || '',
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   emailHost: process.env.EMAIL_HOST,
@@ -19,7 +19,11 @@ export const config = {
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10),
-  allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || ['image/jpeg', 'image/png', 'application/pdf'],
+  allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || [
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+  ],
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',
 };
@@ -28,8 +32,21 @@ export const requiredEnvVars = ['JWT_SECRET', 'DATABASE_URL'];
 
 export function validateEnv(): void {
   for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-      throw new Error(`Required environment variable ${envVar} is not set`);
+    const val = process.env[envVar];
+    if (!val || val.trim() === '') {
+      throw new Error(`[Config Error] Required environment variable '${envVar}' is missing or empty.`);
     }
+  }
+
+  const dbUrl = process.env.DATABASE_URL || '';
+  const validDbProtocols = ['postgresql://', 'postgres://', 'prisma+postgres://'];
+  const hasValidProtocol = validDbProtocols.some((prefix) => dbUrl.startsWith(prefix));
+
+  if (!hasValidProtocol) {
+    throw new Error(
+      `[Config Error] Invalid DATABASE_URL protocol. Expected one of: ${validDbProtocols.join(
+        ', '
+      )}. Received: '${dbUrl.split('://')[0]}://...'`
+    );
   }
 }
