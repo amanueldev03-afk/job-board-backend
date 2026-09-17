@@ -112,27 +112,27 @@ npm test
 
 ## 📊 API Endpoints
 
-### Health Check
+### Health Check & Status
 - `GET /health` - Server health status with database connection
-- `GET /api/status` - API status information
+- `GET /api/v1/status` - API v1 status information
 
 ### Authentication (To be implemented)
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `POST /api/auth/logout` - Logout user
+- `POST /api/v1/auth/register` - Register new user
+- `POST /api/v1/auth/login` - Login user
+- `POST /api/v1/auth/logout` - Logout user
 
 ### Jobs (To be implemented)
-- `GET /api/jobs` - Get all jobs with filters
-- `GET /api/jobs/:id` - Get job by ID
-- `POST /api/jobs` - Create new job (company only)
-- `PUT /api/jobs/:id` - Update job (company only)
-- `DELETE /api/jobs/:id` - Delete job (company only)
+- `GET /api/v1/jobs` - Get all jobs with filters
+- `GET /api/v1/jobs/:id` - Get job by ID
+- `POST /api/v1/jobs` - Create new job (company only)
+- `PUT /api/v1/jobs/:id` - Update job (company only)
+- `DELETE /api/v1/jobs/:id` - Delete job (company only)
 
 ### Applications (To be implemented)
-- `POST /api/applications/:jobId/apply` - Apply for job
-- `GET /api/applications` - Get my applications
-- `GET /api/applications/:id` - Get application by ID
-- `PUT /api/applications/:id/status` - Update application status (company only)
+- `POST /api/v1/applications/:jobId/apply` - Apply for job
+- `GET /api/v1/applications` - Get my applications
+- `GET /api/v1/applications/:id` - Get application by ID
+- `PUT /api/v1/applications/:id/status` - Update application status (company only)
 
 ## 🗄️ Database Schema
 
@@ -176,10 +176,10 @@ npm test
 ## 🔒 Security Features
 
 - Password hashing with bcrypt
-- JWT token authentication
-- Rate limiting
+- JWT token authentication with role-based authorization
+- Rate limiting & Helmet security headers
 - CORS configuration
-- Input validation
+- Input validation (`express-validator` middleware)
 - SQL injection prevention (Prisma ORM)
 - Type safety with TypeScript
 
@@ -192,15 +192,33 @@ job-board-backend/
 │   └── migrations/            # Database migrations
 ├── src/
 │   ├── config/
-│   │   └── index.ts           # Environment & runtime configuration
+│   │   └── index.ts           # Centralized environment & runtime configuration
+│   ├── types/
+│   │   ├── auth.ts            # Auth & JWT payload types
+│   │   ├── response.ts        # Standard API response & pagination types
+│   │   ├── express.d.ts       # Express request extensions
+│   │   └── index.ts           # Type definitions barrel export
+│   ├── utils/
+│   │   ├── response.ts        # Standardized API response helpers (sendSuccess, sendCreated, sendPaginated)
+│   │   ├── asyncHandler.ts    # Async controller error wrapper
+│   │   └── logger.ts          # Structured logger utility
+│   ├── middleware/
+│   │   ├── errorHandler.ts    # Centralized error classes & 404 handler
+│   │   ├── auth.ts            # JWT authentication & role-based authorization
+│   │   └── validate.ts        # Request validation middleware foundation
+│   ├── routes/
+│   │   ├── health.ts          # Root /health route
+│   │   ├── v1/
+│   │   │   ├── status.ts      # API v1 status route
+│   │   │   └── index.ts       # API v1 routes root
+│   │   └── index.ts           # Main router mounting
 │   ├── lib/
 │   │   └── prisma.ts          # Prisma client with PostgreSQL adapter
-│   ├── middleware/
-│   │   └── errorHandler.ts    # Centralized error & 404 handling
-│   ├── routes/
-│   │   └── health.ts          # Health check and status routes
-│   ├── app.ts                 # Express application configuration
-│   └── index.ts               # Application entry point & server lifecycle
+│   ├── app.ts                 # Express application initialization & middleware pipeline
+│   ├── server.ts              # Server startup, database check & graceful shutdown
+│   └── index.ts               # Application entry point
+├── test/
+│   └── app.test.ts            # Modular architecture & endpoints test suite
 ├── .env.example               # Environment variables template
 ├── prisma.config.ts           # Prisma 7 configuration file
 ├── tsconfig.json              # TypeScript configuration
