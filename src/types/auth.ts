@@ -1,10 +1,11 @@
-export type UserRole = 'CANDIDATE' | 'COMPANY' | 'ADMIN';
+export type UserRole = 'CANDIDATE' | 'EMPLOYER' | 'ADMIN';
 
 export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
-  companyId?: string;
+  candidateId?: string;
+  employerId?: string;
 }
 
 export interface JwtTokenPayload {

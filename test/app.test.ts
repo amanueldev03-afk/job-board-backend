@@ -226,8 +226,8 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
       { expiresIn: '1h' }
     );
 
-    const sampleCompanyToken = jwt.sign(
-      { userId: 'user-comp-1', email: 'company@test.com', role: 'COMPANY' } as JwtTokenPayload,
+    const sampleEmployerToken = jwt.sign(
+      { userId: 'user-emp-1', email: 'employer@test.com', role: 'EMPLOYER' } as JwtTokenPayload,
       config.jwtSecret,
       { expiresIn: '1h' }
     );
@@ -237,11 +237,11 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
     });
 
     testApp.get(
-      '/test/company-only',
+      '/test/employer-only',
       authenticate,
-      requireRole('COMPANY', 'ADMIN'),
+      requireRole('EMPLOYER', 'ADMIN'),
       (_req: Request, res: Response) => {
-        res.json({ success: true, companyAccess: true });
+        res.json({ success: true, employerAccess: true });
       }
     );
 
@@ -269,9 +269,9 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
       assert.strictEqual(res.body.user?.role, 'CANDIDATE');
     });
 
-    it('should forbid CANDIDATE from accessing COMPANY-only endpoints with 403', async () => {
+    it('should forbid CANDIDATE from accessing EMPLOYER-only endpoints with 403', async () => {
       const res = await request(testApp)
-        .get('/test/company-only')
+        .get('/test/employer-only')
         .set('Authorization', `Bearer ${sampleCandidateToken}`);
 
       assert.strictEqual(res.status, 403);
@@ -279,14 +279,14 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
       assert.match(res.body.error, /not authorized to access this resource/);
     });
 
-    it('should allow COMPANY to access COMPANY-only endpoints', async () => {
+    it('should allow EMPLOYER to access EMPLOYER-only endpoints', async () => {
       const res = await request(testApp)
-        .get('/test/company-only')
-        .set('Authorization', `Bearer ${sampleCompanyToken}`);
+        .get('/test/employer-only')
+        .set('Authorization', `Bearer ${sampleEmployerToken}`);
 
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
-      assert.strictEqual(res.body.companyAccess, true);
+      assert.strictEqual(res.body.employerAccess, true);
     });
 
     it('optionalAuth should populate user when token is provided and null when absent', async () => {
@@ -296,9 +296,9 @@ describe('Job Board Platform Modular Architecture Test Suite', () => {
 
       const resWithToken = await request(testApp)
         .get('/test/optional-auth')
-        .set('Authorization', `Bearer ${sampleCompanyToken}`);
+        .set('Authorization', `Bearer ${sampleEmployerToken}`);
       assert.strictEqual(resWithToken.status, 200);
-      assert.strictEqual(resWithToken.body.user?.id, 'user-comp-1');
+      assert.strictEqual(resWithToken.body.user?.id, 'user-emp-1');
     });
   });
 
