@@ -134,44 +134,55 @@ npm test
 - `GET /api/v1/applications/:id` - Get application by ID
 - `PUT /api/v1/applications/:id/status` - Update application status (company only)
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema & Relational Models
 
 ### Users
-- UUID primary key
-- Email, password, name
-- Role (candidate/company/admin)
-- Profile information
-- Email verification
-- Password reset
+- `id` (UUID Primary Key)
+- `email` (Unique), `password`, `name`, `role` (CANDIDATE / EMPLOYER / ADMIN), `phone`, `avatar`, `isActive`, `isVerified`
+- 1:1 relation with `Candidate`
+- 1:1 relation with `Employer`
+- 1:N relation with `Notification`
 
-### Companies
-- UUID primary key
-- User reference (one-to-one)
-- Company name, description, location
-- Industry, company size, benefits
-- Rating system
+### Candidates
+- `id` (UUID Primary Key)
+- `userId` (Unique foreign key referencing `User.id` with `CASCADE` delete)
+- `headline`, `bio`, `location`, `skills` (Array), `experienceYears`, `education`, social URLs
+- 1:N relation with `Resume`
+- 1:N relation with `Application`
+
+### Employers
+- `id` (UUID Primary Key)
+- `userId` (Unique foreign key referencing `User.id` with `CASCADE` delete)
+- `companyName` (Unique), `companyDescription`, `companyWebsite`, `industry`, `companySize`, `location`, `logo`, `isVerified`
+- 1:N relation with `Job`
 
 ### Jobs
-- UUID primary key
-- Company reference (many-to-one)
-- Title, description, requirements
-- Location, compensation, employment type
-- Skills, benefits, deadline
-- Status tracking (draft, published, closed, expired)
+- `id` (UUID Primary Key)
+- `employerId` (Foreign key referencing `Employer.id` with `CASCADE` delete)
+- `title`, `description`, `requirements` (Array), `responsibilities` (Array), `skills` (Array), `location`, `isRemote`
+- `jobType` (FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP, REMOTE)
+- `experienceLevel` (ENTRY, JUNIOR, MID, SENIOR, LEAD, EXECUTIVE)
+- `salaryMin`, `salaryMax`, `currency`, `status` (DRAFT, OPEN, CLOSED, EXPIRED), `deadline`
+- 1:N relation with `Application`
+
+### Resumes
+- `id` (UUID Primary Key)
+- `candidateId` (Foreign key referencing `Candidate.id` with `CASCADE` delete)
+- `fileName`, `fileUrl`, `fileSize`, `mimeType`, `isPrimary`
+- 1:N relation with `Application`
 
 ### Applications
-- UUID primary key
-- Job and candidate references
-- Status tracking (pending, reviewed, shortlisted, rejected, hired, withdrawn)
-- Documents (resume, cover letter, portfolio)
-- Interview details and timeline
+- `id` (UUID Primary Key)
+- `jobId` (Foreign key referencing `Job.id` with `CASCADE` delete)
+- `candidateId` (Foreign key referencing `Candidate.id` with `CASCADE` delete)
+- `resumeId` (Nullable foreign key referencing `Resume.id` with `SET NULL` on delete)
+- `coverLetter`, `status` (SUBMITTED, UNDER_REVIEW, SHORTLISTED, INTERVIEW_SCHEDULED, REJECTED, ACCEPTED, WITHDRAWN), `notes`, `appliedAt`
+- Compound Unique constraint: `(jobId, candidateId)` (prevents duplicate applications)
 
-### RefreshTokens
-- UUID primary key
-- Token string (unique)
-- User reference
-- Expiration date
-- Device info and IP tracking
+### Notifications
+- `id` (UUID Primary Key)
+- `userId` (Foreign key referencing `User.id` with `CASCADE` delete)
+- `title`, `message`, `type` (APPLICATION_RECEIVED, STATUS_UPDATED, JOB_ALERT, SYSTEM), `isRead`, `metadata` (JSON)
 
 ## 🔒 Security Features
 
