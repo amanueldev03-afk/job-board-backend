@@ -83,3 +83,10 @@ export const requireRole = (...roles: UserRole[]) => {
     next();
   };
 };
+
+export const requireCandidate = requireRole('CANDIDATE', 'ADMIN');
+export const requireEmployer = requireRole('EMPLOYER', 'ADMIN');
+export const requireAdmin = requireRole('ADMIN');
+export const requireCandidateOnly = requireRole('CANDIDATE');
+export const requireEmployerOnly = requireRole('EMPLOYER');
+
